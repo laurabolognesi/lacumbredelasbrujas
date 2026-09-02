@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0607" />
+  <meta name="description" content="Experiencia WebAR para La cumbre de las brujas: reconocimiento de portada y reproducción de video vertical sin QR." />
+  <title>La cumbre de las brujas · WebAR</title>
+  <link rel="stylesheet" href="./styles.css?v=2" />
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jsfeat/0.0.8/jsfeat-min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/jsfeat@0.0.8/build/jsfeat-min.js'"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script defer src="./app.js?v=2"></script>
+</head>
+<body>
+  <main class="app" id="app">
+    <video id="camera" playsinline muted aria-hidden="true"></video>
+    <canvas id="arCanvas" aria-label="Vista de cámara con realidad aumentada"></canvas>
+
+    <div class="tracked-layer" id="arLayer" hidden>
+      <div class="tracked-plane" id="arPlane" aria-hidden="true">
+        <div class="tracked-plane__glow"></div>
+        <div class="tracked-plane__shell">
+          <div class="video-frame">
+            <div class="video-frame__header">
+              <span class="video-frame__tag">PORTAL VISUAL</span>
+              <span class="video-frame__state" id="planeState">Video listo</span>
+            </div>
+            <div class="video-stage" id="videoStage">
+              <div class="video-placeholder" id="videoPlaceholder">
+                <div class="video-placeholder__cover"></div>
+                <div class="video-placeholder__veil"></div>
+                <div class="video-placeholder__copy">
+                  <p class="video-placeholder__eyebrow">LA CUMBRE DE LAS BRUJAS</p>
+                  <h2>Preparando el portal visual</h2>
+                  <p>
+                    Al reconocer la portada, el video aparece sobre el libro y acompaña su movimiento.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="video-frame__footer">
+              <span class="video-frame__title">Laura Bolognesi</span>
+              <span class="video-frame__meta" id="planeMeta">Seguimiento activo de portada</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span>LA CUMBRE DE LAS BRUJAS · WEBAR</span>
+      </div>
+      <div class="status" id="status" data-state="idle">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span id="statusText">Preparando detector…</span>
+      </div>
+    </header>
+
+    <section class="start" id="startPanel">
+      <div class="start__backdrop"></div>
+      <div class="start__card">
+        <div class="target-preview">
+          <img src="./assets/target.jpg" alt="Portada de La cumbre de las brujas que será reconocida" />
+          <span class="target-preview__scan" aria-hidden="true"></span>
+        </div>
+
+        <p class="eyebrow">PRUEBA DE EXPERIENCIA AUMENTADA</p>
+        <h1>Apuntá la cámara a la portada</h1>
+        <p class="intro">
+          La web reconoce el libro sin QR y reproduce un video vertical siguiendo el movimiento de la tapa.
+        </p>
+
+        <div class="actions">
+          <button class="button button--primary" id="startCamera" type="button" disabled>
+            <span>Iniciar experiencia</span>
+          </button>
+          <button class="button button--secondary" id="startDemo" type="button" disabled>
+            Probar sin cámara
+          </button>
+        </div>
+
+        <a class="laboratory-link" href="./diorama.html">
+          Explorar laboratorio de dioramas 3D
+        </a>
+
+        <p class="helper" id="helperText">
+          Para la prueba, mostrá la portada completa desde otra pantalla o imprimila con buen contraste.
+        </p>
+      </div>
+    </section>
+
+    <section class="hud" id="hud" hidden>
+      <div class="reticle" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+      </div>
+      <p class="instruction" id="instruction">Buscá la portada completa dentro del encuadre</p>
+      <button class="sound" id="soundButton" type="button" aria-pressed="false">Activar sonido</button>
+      <button class="close" id="stopButton" type="button" aria-label="Cerrar cámara">×</button>
+    </section>
+
+    <aside class="debug" id="debugPanel" hidden>
+      <span id="debugText">0 puntos · 0 coincidencias</span>
+    </aside>
+  </main>
+
+  <noscript>Esta prueba necesita JavaScript para acceder a la cámara y reconocer la portada.</noscript>
+</body>
+</html>

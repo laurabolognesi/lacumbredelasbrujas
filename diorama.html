@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#090405" />
+  <meta name="description" content="Laboratorio 3D para las ilustraciones interiores de La cumbre de las brujas." />
+  <title>Laboratorio de dioramas · La cumbre de las brujas</title>
+  <link rel="stylesheet" href="./diorama.css?v=2" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+    }
+  }
+  </script>
+  <script type="module" src="./js/diorama/diorama-app.js?v=7"></script>
+</head>
+<body>
+  <main class="laboratory" id="laboratory">
+    <div class="stage" id="stage" aria-label="Diorama tridimensional interactivo"></div>
+
+    <div class="fallback" id="fallback" hidden aria-label="Versión liviana del diorama">
+      <div class="fallback__page">
+        <div class="fallback__woman">
+          <i class="fallback__head"></i>
+          <i class="fallback__body"></i>
+          <i class="fallback__dress"></i>
+        </div>
+        <div class="fallback__fire">
+          <i></i><i></i><i></i>
+        </div>
+        <div class="fallback__smoke"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+
+    <header class="labbar">
+      <a class="labbar__back" href="./">← Portada AR</a>
+      <div class="labbar__identity">
+        <span>LA CUMBRE DE LAS BRUJAS</span>
+        <strong>LABORATORIO DE DIORAMAS</strong>
+      </div>
+      <span class="labbar__quality" id="qualityLabel">Analizando dispositivo…</span>
+    </header>
+
+    <section class="intro" id="intro">
+      <p class="intro__eyebrow">PRUEBA 2.5D · CAPÍTULO III</p>
+      <h1>La página queda.<br />El mundo se apaga.</h1>
+      <p>
+        Seis mujeres de páginas plegadas forman una ronda animada en doce poses.
+        Arrastrá suavemente para percibir las capas y pellizcá para acercarte.
+      </p>
+      <button id="enterButton" type="button">Ver la prueba sobre la página</button>
+      <small id="introNote">No necesita cámara en este modo de laboratorio.</small>
+    </section>
+
+    <section class="controls" id="controls" hidden>
+      <button id="replayButton" type="button">Repetir aparición</button>
+      <span id="performanceLabel">Midiendo rendimiento…</span>
+    </section>
+
+    <div class="status" id="sceneStatus" role="status">Preparando papel y pliegues…</div>
+  </main>
+</body>
+</html>
