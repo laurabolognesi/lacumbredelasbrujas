@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "activeScene": "women-circle-25d",
+  "scenes": [
+    {
+      "id": "women-circle-25d",
+      "title": "Ronda de mujeres junto al fuego",
+      "targetIndex": 0,
+      "targetImage": "assets/diorama/women-circle-25d/book-page-reference-v1.jpg",
+      "targetCompiled": "assets/targets/interiores.mind",
+      "module": "js/diorama/scenes/women-circle-25d.js",
+      "fallback": "multiplane-2.5d",
+      "budgetMB": {
+        "high": 3,
+        "low": 2,
+        "fallback": 1
+      },
+      "layers": [
+        "circle-back-v1.png",
+        "circle-fire-v1.png",
+        "circle-front-v1.png",
+        "circle-fire-glow-v1.png"
+      ],
+      "status": "prototype"
+    },
+    {
+      "id": "woman-fire",
+      "title": "Mujer junto a la fogata",
+      "targetIndex": 0,
+      "targetImage": null,
+      "targetCompiled": "assets/targets/interiores.mind",
+      "module": "js/diorama/scenes/woman-fire.js",
+      "fallback": "procedural-2.5d",
+      "budgetMB": {
+        "high": 6,
+        "low": 3,
+        "fallback": 1
+      },
+      "textFragments": [
+        {
+          "page": null,
+          "excerpt": null,
+          "rightsCleared": false
+        }
+      ],
+      "status": "prototype"
+    }
+  ]
+}
