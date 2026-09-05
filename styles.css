@@ -94,6 +94,26 @@ button { font: inherit; }
 }
 
 .tracked-plane.is-visible { opacity: 1; }
+.tracked-plane[data-kind] { filter: none; }
+.tracked-plane[data-kind] .tracked-plane__glow,
+.tracked-plane[data-kind] .video-frame__header,
+.tracked-plane[data-kind] .video-frame__footer { display: none; }
+.tracked-plane[data-kind] .tracked-plane__shell,
+.tracked-plane[data-kind] .video-stage { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.tracked-plane[data-kind] .video-frame { padding: 0; gap: 0; }
+.instagram-action {
+  position: absolute;
+  left: 8%; right: 8%; top: 55%;
+  padding: 20px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #57162f, #ff562f);
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font: 700 20px/1.3 system-ui, sans-serif;
+  pointer-events: auto;
+}
+.instagram-action:focus-visible { outline: 3px solid white; }
 
 .tracked-plane__glow {
   position: absolute;
@@ -115,7 +135,7 @@ button { font: inherit; }
   border: 1px solid rgba(255,255,255,.22);
   background:
     linear-gradient(180deg, rgba(9,5,7,.35), rgba(9,5,7,.82)),
-    url('./assets/target.jpg') center/cover no-repeat;
+    url('./assets/targets/portada.png') center/cover no-repeat;
   box-shadow:
     inset 0 0 0 1px rgba(255,255,255,.10),
     inset 0 0 50px rgba(255,90,38,.12);
@@ -182,7 +202,7 @@ button { font: inherit; }
   inset: 0;
   background:
     linear-gradient(180deg, rgba(8,4,6,.18), rgba(8,4,6,.82)),
-    url('./assets/target.jpg') center/cover no-repeat;
+    url('./assets/targets/portada.png') center/cover no-repeat;
   transform: scale(1.07);
   filter: saturate(1.1) contrast(1.08);
 }
@@ -295,7 +315,7 @@ button { font: inherit; }
   inset: 0;
   display: grid;
   place-items: center;
-  padding: max(72px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+  padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
   overflow-y: auto;
   transition: opacity 240ms ease, visibility 240ms ease;
 }
@@ -329,7 +349,7 @@ button { font: inherit; }
 .target-preview {
   position: relative;
   width: min(200px, 46vw);
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 1571 / 2398;
   margin: 0 auto 24px;
   overflow: hidden;
   border-radius: 20px;
@@ -347,16 +367,6 @@ button { font: inherit; }
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.18));
-}
-.target-preview__scan {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  top: 10%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #fff, transparent);
-  box-shadow: 0 0 16px 3px rgba(255,255,255,.72);
-  animation: scanline 2.8s ease-in-out infinite;
 }
 
 @keyframes scanline {
@@ -387,10 +397,12 @@ h1 {
   line-height: 1.55;
 }
 .actions {
+  margin-top: 24px;
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
 }
+.helper:empty { display: none; }
 .button {
   width: 100%;
   min-height: 52px;
@@ -406,6 +418,13 @@ h1 {
   color: white;
   background: linear-gradient(135deg, #57162f, #ff562f);
   box-shadow: 0 14px 32px rgba(255,86,47,.22);
+}
+#startCamera:not(:disabled) {
+  animation: invitation-glow 3s ease-in-out infinite;
+}
+@keyframes invitation-glow {
+  0%, 100% { box-shadow: 0 10px 26px rgba(255,86,47,.20), 0 0 0 0 rgba(255,124,59,0); }
+  50% { box-shadow: 0 12px 38px rgba(255,86,47,.46), 0 0 18px 2px rgba(255,124,59,.18); }
 }
 .button--secondary {
   color: white;

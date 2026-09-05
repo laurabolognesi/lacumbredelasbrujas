@@ -20,19 +20,25 @@
     minimumTrackedRevealMs: 260
   };
 
-  const EXPERIENCE = {
-    title: 'La cumbre de las brujas',
-    author: 'Laura Bolognesi',
-    youtubeVideoId: 'oMnK9Viihg8',
-    autoplayMuted: true
-  };
+  const TARGETS = [
+    { id: 'portada', title: 'Portada', image: 'portada.png', vimeo: '1223490602' },
+    { id: 'coro', title: 'Coro de mujeres', image: 'coro.jpg', vimeo: '1223490223' },
+    { id: 'foto', title: 'Foto de Nelly y sus hermanas', image: 'foto.jpg', vimeo: '1223489715' },
+    { id: 'diario', title: 'Portada de diario', image: 'diario.jpg', vimeo: '1223488404' },
+    { id: 'post', title: 'Sofía Rivera', image: 'post.jpg', url: 'https://www.instagram.com/sofiariveraperiodista/' },
+    { id: 'epilogo', title: 'Epílogo', image: 'epilogo.jpg', vimeo: '1223479370' }
+  ];
+  let activeTarget = null;
+  let searchIndex = 0;
+  let candidateId = null;
+  let candidateHits = 0;
+  const demoId = new URLSearchParams(location.search).get('target') || 'portada';
 
   const app = document.getElementById('app');
   const video = document.getElementById('camera');
   const canvas = document.getElementById('arCanvas');
   const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   const startCameraButton = document.getElementById('startCamera');
-  const startDemoButton = document.getElementById('startDemo');
   const stopButton = document.getElementById('stopButton');
   const hud = document.getElementById('hud');
   const status = document.getElementById('status');
@@ -49,9 +55,7 @@
   const planeState = document.getElementById('planeState');
   const planeMeta = document.getElementById('planeMeta');
 
-  const targetImage = new Image();
-  targetImage.decoding = 'async';
-  targetImage.src = './assets/target.jpg';
+  let targetImage;
 
   let frameWidth = 480;
   let frameHeight = 640;
@@ -76,11 +80,10 @@
   let smoothedCorners = null;
   let lastDetection = null;
   let detectionStartedAt = 0;
-  let youtubeMounted = false;
-  let youtubeReady = false;
-  let youtubeShouldPlay = false;
-  let youtubeMuted = EXPERIENCE.autoplayMuted;
-  let youtubePlayer = null;
+  let mediaPlayer = null;
+  let mediaMuted = true;
+  let playbackWanted = false;
+  let mediaReady = false;
   let layerRect = { left: 0, top: 0, width: 0, height: 0 };
 
   class Match {
@@ -128,15 +131,23 @@
 
     try {
       await waitForLibrary();
-      await targetImage.decode();
+
       configureCanvas();
       allocateDetector();
-      trainPattern(targetImage);
+      for (const target of TARGETS) {
+        target.bitmap = new Image();
+        target.bitmap.src = './assets/targets/' + target.image;
+        await target.bitmap.decode();
+        trainPattern(target.bitmap);
+        target.pattern = { patternCorners, patternDescriptors, patternWidth, patternHeight };
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      targetImage = (TARGETS.find(t => t.id === demoId) || TARGETS[0]).bitmap;
+      usePattern(TARGETS[0]);
       trained = true;
       startCameraButton.disabled = false;
-      startDemoButton.disabled = false;
       setStatus('Detector listo', 'ready');
-      planeState.textContent = EXPERIENCE.youtubeVideoId ? 'Video listo' : 'Esperando video';
+      planeState.textContent = 'Contenido listo';
       planeMeta.textContent = 'Seguimiento activo de portada';
 
       const params = new URLSearchParams(window.location.search);
@@ -258,6 +269,8 @@
   }
 
   function beginRunning(mode) {
+    soundButton.hidden = false;
+    mediaMuted = true;
     runningMode = mode;
     frameNumber = 0;
     lostFrames = 0;
@@ -272,10 +285,10 @@
     syncLayerBounds();
     hideTrackedPlane();
     instruction.textContent = mode === 'camera'
-      ? 'Buscá la portada completa dentro del encuadre'
+      ? 'Apuntá a una de las páginas con experiencia aumentada'
       : 'Modo de demostración: reconocimiento sobre una escena simulada';
-    setStatus('Buscando portada…', 'searching');
-    mountYouTubePlayer();
+    setStatus('Buscando página…', 'searching');
+
     rafId = requestAnimationFrame(tick);
   }
 
@@ -283,12 +296,15 @@
     cancelAnimationFrame(rafId);
     rafId = 0;
     runningMode = null;
+    activeTarget = null;
+    candidateId = null;
+    candidateHits = 0;
     app.classList.remove('is-running', 'has-target', 'has-sound');
     hud.hidden = true;
     lastDetection = null;
     smoothedCorners = null;
     detectionStartedAt = 0;
-    setYouTubePlayback(false);
+    setMediaPlayback(false);
     hideTrackedPlane(true);
 
     if (stream) {
@@ -315,7 +331,7 @@
     if (frameNumber % CONFIG.processEveryNFrames === 0) detectCurrentFrame();
 
     if (lastDetection && lostFrames <= CONFIG.lostToleranceFrames) {
-      drawAugmentedOverlay(lastDetection.corners, lastDetection.inliers, now);
+
       updateTrackedPlane(lastDetection.corners, now, lastDetection.inliers);
     }
   }
@@ -390,17 +406,49 @@
       const cornerCount = detectKeypoints(frameSmooth, screenCorners, CONFIG.maxScreenPoints);
       jsfeat.orb.describe(frameSmooth, screenCorners, cornerCount, screenDescriptors);
 
-      const matchCount = matchPattern();
+      // Track the current page first; scan one other target per processed frame.
+      let tested = activeTarget;
+      let matchCount = 0;
+      let projectedCandidate = null;
+      let candidateInliers = 0;
+      const candidates = activeTarget ? [activeTarget] : [];
+      const next = TARGETS[searchIndex++ % TARGETS.length];
+      if (next !== activeTarget) candidates.push(next);
+      for (const target of candidates) {
+        usePattern(target);
+        const count = matchPattern();
+        if (count < CONFIG.minMatches) continue;
+        const valid = findTransform(count);
+        if (valid < CONFIG.minInliers) continue;
+        const quad = projectCorners(homography.data, patternWidth, patternHeight);
+        if (!isValidQuadrilateral(quad)) continue;
+        tested = target;
+        matchCount = count;
+        candidateInliers = valid;
+        projectedCandidate = quad;
+        break;
+      }
       let inliers = 0;
       let corners = null;
 
-      if (matchCount >= CONFIG.minMatches) {
-        inliers = findTransform(matchCount);
-        if (inliers >= CONFIG.minInliers) {
-          const projected = projectCorners(homography.data, patternWidth, patternHeight);
-          if (isValidQuadrilateral(projected)) corners = smoothQuadrilateral(projected);
+      if (projectedCandidate) {
+        if (tested !== activeTarget) {
+          candidateHits = candidateId === tested.id ? candidateHits + 1 : 1;
+          candidateId = tested.id;
+          if (candidateHits >= 2) {
+            unmountMedia();
+            activeTarget = tested;
+            smoothedCorners = null;
+            detectionStartedAt = 0;
+            candidateHits = 0;
+          }
+        } else { candidateId = null; candidateHits = 0; }
+        if (tested === activeTarget) {
+          inliers = candidateInliers;
+          corners = smoothQuadrilateral(projectedCandidate);
         }
       }
+      if (activeTarget) usePattern(activeTarget);
 
       debugText.textContent = `${cornerCount} puntos · ${matchCount} coincidencias · ${inliers} válidas`;
 
@@ -409,19 +457,22 @@
         lastDetection = { corners, inliers };
         if (!detectionStartedAt) detectionStartedAt = performance.now();
         app.classList.add('has-target');
-        setStatus('Portada detectada', 'detected');
-        instruction.textContent = 'La portada fue reconocida';
+        setStatus(activeTarget.title + ' detectado', 'detected');
+        instruction.textContent = activeTarget.title;
       } else {
         lostFrames += 1;
         if (lostFrames > CONFIG.lostToleranceFrames) {
           lastDetection = null;
+          smoothedCorners = null;
+          activeTarget = null;
+          unmountMedia();
           detectionStartedAt = 0;
           app.classList.remove('has-target');
-          setStatus('Buscando portada…', 'searching');
+          setStatus('Buscando página…', 'searching');
           instruction.textContent = runningMode === 'camera'
-            ? 'Buscá la portada completa dentro del encuadre'
+            ? 'Apuntá a una de las páginas con experiencia aumentada'
             : 'Modo de demostración: reconocimiento sobre una escena simulada';
-          setYouTubePlayback(false);
+          setMediaPlayback(false);
           hideTrackedPlane();
         }
       }
@@ -733,17 +784,19 @@
 
     if (detectionStartedAt && performance.now() - detectionStartedAt > CONFIG.minimumTrackedRevealMs) {
       arLayer.hidden = false;
+      arPlane.setAttribute('aria-hidden', 'false');
       arPlane.classList.add('is-visible');
       planeMeta.textContent = `Seguimiento activo · ${inliers} coincidencias útiles`;
-      setYouTubePlayback(true);
+      setMediaPlayback(true);
     }
   }
 
   function hideTrackedPlane(forceUnmount = false) {
     arPlane.classList.remove('is-visible');
     arLayer.hidden = true;
+    arPlane.setAttribute('aria-hidden', 'true');
     planeMeta.textContent = 'Seguimiento activo de portada';
-    if (forceUnmount) unmountYouTubePlayer();
+    if (forceUnmount) unmountMedia();
   }
 
   function syncLayerBounds() {
@@ -755,75 +808,86 @@
     arLayer.style.height = `${rect.height}px`;
   }
 
-  function mountYouTubePlayer() {
-    if (youtubeMounted || !EXPERIENCE.youtubeVideoId) return;
-    youtubeMounted = true;
-    youtubeReady = false;
-    planeState.textContent = 'Cargando video';
-    videoPlaceholder.hidden = true;
-    const playerHost = document.createElement('div');
-    playerHost.id = 'youtubePlayer';
-    videoStage.appendChild(playerHost);
-    createYouTubePlayer();
+  function usePattern(target) {
+    ({ patternCorners, patternDescriptors, patternWidth, patternHeight } = target.pattern);
   }
 
-  function createYouTubePlayer() {
-    if (!youtubeMounted || youtubePlayer || !window.YT?.Player) return;
-    youtubePlayer = new window.YT.Player('youtubePlayer', {
-      videoId: EXPERIENCE.youtubeVideoId,
-      playerVars: {
-        autoplay: 0,
-        controls: 0,
-        playsinline: 1,
-        rel: 0,
-        loop: 1,
-        playlist: EXPERIENCE.youtubeVideoId,
-        origin: window.location.origin
-      },
-      events: {
-        onReady: (event) => {
-          youtubeReady = true;
-          if (youtubeMuted) event.target.mute();
-          setYouTubePlayback(youtubeShouldPlay);
-        },
-        onError: () => {
-          planeState.textContent = 'Video no disponible';
-        }
+  function mountMedia() {
+    if (!activeTarget || videoStage.dataset.target === activeTarget.id) return;
+    unmountMedia();
+    videoStage.dataset.target = activeTarget.id;
+    arPlane.dataset.kind = activeTarget.url ? 'link' : 'video';
+    soundButton.hidden = !!activeTarget.url;
+    videoPlaceholder.hidden = true;
+    if (activeTarget.url) {
+      const link = document.createElement('a');
+      link.className = 'instagram-action';
+      link.href = activeTarget.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Abrir Instagram de Sofía';
+      videoStage.appendChild(link);
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.title = activeTarget.title;
+    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+    iframe.src = 'https://player.vimeo.com/video/' + activeTarget.vimeo +
+      '?autoplay=0&muted=1&loop=1&playsinline=1&title=0&byline=0&portrait=0&controls=0';
+    videoStage.appendChild(iframe);
+    if (!window.Vimeo?.Player) { showMediaError(); return; }
+    const player = new Vimeo.Player(iframe);
+    mediaPlayer = player;
+    player.ready().then(async () => {
+      if (mediaPlayer !== player) return;
+      mediaReady = true;
+      await player.setMuted(mediaMuted);
+      if (mediaPlayer !== player) return;
+      const wanted = playbackWanted;
+      playbackWanted = !wanted;
+      setMediaPlayback(wanted);
+    }).catch(() => { if (mediaPlayer === player) showMediaError(); });
+    player.on('error', () => { if (mediaPlayer === player) showMediaError(); });
+  }
+
+  function showMediaError() {
+    instruction.textContent = 'No se pudo reproducir. Revisá la conexión y los permisos del video en Vimeo.';
+  }
+
+  function unmountMedia() {
+    const previous = mediaPlayer;
+    mediaPlayer = null;
+    mediaReady = false;
+    playbackWanted = false;
+    previous?.destroy().catch(() => {});
+    videoStage.querySelectorAll('iframe, .instagram-action').forEach(node => node.remove());
+    delete videoStage.dataset.target;
+    videoPlaceholder.hidden = false;
+  }
+
+  function setMediaPlayback(shouldPlay) {
+    if (shouldPlay) mountMedia();
+    if (playbackWanted === shouldPlay) return;
+    playbackWanted = shouldPlay;
+    if (!mediaReady || !mediaPlayer) return;
+    const player = mediaPlayer;
+    (shouldPlay ? player.play() : player.pause()).catch(() => {
+      if (mediaPlayer === player && shouldPlay) {
+        instruction.textContent = 'Tocá Activar sonido para iniciar el video';
       }
     });
   }
 
-  function unmountYouTubePlayer() {
-    if (youtubePlayer?.destroy) youtubePlayer.destroy();
-    else document.getElementById('youtubePlayer')?.remove();
-    youtubePlayer = null;
-    youtubeMounted = false;
-    youtubeReady = false;
-    youtubeShouldPlay = false;
-    planeState.textContent = EXPERIENCE.youtubeVideoId ? 'Video listo' : 'Esperando video';
-    videoPlaceholder.hidden = false;
-  }
-
-  function setYouTubePlayback(shouldPlay) {
-    youtubeShouldPlay = shouldPlay;
-    if (!youtubeMounted || !youtubeReady || !youtubePlayer) return;
-    if (shouldPlay) youtubePlayer.playVideo();
-    else youtubePlayer.pauseVideo();
-    planeState.textContent = shouldPlay
-      ? (youtubeMuted ? 'Video en reproducción' : 'Video con sonido')
-      : 'Video listo';
-  }
-
   function activateSound() {
-    youtubeMuted = false;
-    youtubePlayer?.unMute();
-    youtubePlayer?.setVolume(100);
+    mediaMuted = false;
+    if (mediaPlayer) {
+      mediaPlayer.setMuted(false).catch(showMediaError);
+      mediaPlayer.setVolume(1).catch(() => {});
+      mediaPlayer.play().catch(showMediaError);
+    }
     app.classList.add('has-sound');
     soundButton.setAttribute('aria-pressed', 'true');
-    planeState.textContent = 'Video con sonido';
   }
-
-  window.onYouTubeIframeAPIReady = createYouTubePlayer;
 
   function computeProjectiveMatrix(source, destination) {
     const h = solveHomography(source, destination);
@@ -929,13 +993,17 @@
   }
 
   startCameraButton.addEventListener('click', startCamera);
-  startDemoButton.addEventListener('click', startDemo);
   soundButton.addEventListener('click', activateSound);
   stopButton.addEventListener('click', stopRunning);
   window.addEventListener('resize', () => {
+    if (!trained) return;
+    lastDetection = null;
+    smoothedCorners = null;
+    detectionStartedAt = 0;
+    setMediaPlayback(false);
+    hideTrackedPlane();
     configureCanvas();
     allocateDetector();
-    trainPattern(targetImage);
     syncLayerBounds();
   });
   window.addEventListener('pagehide', stopRunning);
